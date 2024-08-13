@@ -2,7 +2,9 @@
   (:require
    [humble-outliner.events :as events]
    [humble-outliner.state :as state]
-   [io.github.humbleui.core :as hcore]))
+   [io.github.humbleui.util :as util]
+   [io.github.humbleui.protocols :as protocols]
+   ))
 
 ;; Pumping events for UI demo showcase.
 ;; Taking a lot of shortcuts and hardcoding, but seems that with more effort
@@ -12,8 +14,8 @@
   (let [window @state/*window
         ctx {:window window
              :scale 1.0 #_(window/scale window)
-             :mouse-pos (hcore/ipoint 0 0)}]
-    (hcore/event @state/*app ctx event)))
+             :mouse-pos (util/ipoint 0 0)}]
+    (protocols/-event @state/*app ctx event)))
 
 (defn press-key!
   ([key] (press-key! key #{}))

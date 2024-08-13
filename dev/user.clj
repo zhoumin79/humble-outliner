@@ -1,50 +1,66 @@
-(ns ^{:clojure.tools.namespace.repl/load false}
- user
+(ns user
   (:require
-   [humble-outliner.main :as main]
+   [clj-reload.core :as reload]
+   [duti.core :as duti]
    [humble-outliner.state :as state]
+   [humble-outliner.main :as main]
    [io.github.humbleui.app :as app]
-   [io.github.humbleui.debug :as debug]
    [io.github.humbleui.window :as window]
-   [nrepl.cmdline :as nrepl]
-   [clojure.tools.namespace.repl :as ns]))
+   ))
 
-(defn reset-window
-  "Resets the window position and size back to some defaults."
-  []
-  (app/doui
-    (when-some [window @state/*window]
-      (window/set-window-position window 860 566)
-      (window/set-content-size window 1422 800)
-      #_(window/set-z-order window :floating))))
+(reload/init
+  {:dirs ["src" "dev" "test"]
+   :no-reload '#{user
+                 io.github.humbleui.protocols
+                 io.github.humbleui.signal}})
 
-(defn reload
-  "Reload all namespaces that have changed on disk and redraw the app."
-  []
-  (ns/refresh :after 'humble-outliner.state/redraw!))
+(def ^:dynamic *t0*)
 
-(defn -main
-  "Starts both the UI and the nREPL server."
-  [& args]
-  (ns/set-refresh-dirs "src")
-  ;; start app
-  (main/-main)
+(def monitor)
 
-  ;; (reset! debug/*enabled? true)
+(defn log [& args]
+  (let [dt    (- (System/currentTimeMillis) *t0*)
+        mins  (quot dt 60000)
+        secs  (mod (quot dt 1000) 60)
+        msecs (mod dt 1000)]
+    (apply println (format "%02d:%02d.%03d" mins secs msecs) args))
+  (flush))
 
-  ;; start nREPL server (on another thread)
-  (apply nrepl/-main args))
+(defn reload []
+  (binding [*t0*                     (System/currentTimeMillis)
+            clj-reload.util/*log-fn* log]
+    ;; do not reload in the middle of the frame
+    (locking monitor
+      (duti/reload))))
+
+(defn -main [& args]
+  (let [args (apply array-map args)
+        ;; starting app
+        _    (set! *warn-on-reflection* true)
+        _    (@(requiring-resolve 'main/-main))
+        ;; starting socket repl
+        port (some-> (get args "--port") parse-long)
+        _    (duti/start-socket-repl {:port port})]))
+
 
 (comment
   ;; Anything we do to the app UI, we need to eval it wrapped in `doui` so that
   ;; it runs on the UI thread.
   (reload)
-  (reset-window)
+  ;; (reset-window)
 
   ;; keep window on top even when not focused
   (app/doui
-    (window/set-z-order @state/*window :floating))
+   (window/set-z-order @state/*window :floating))
 
   ;; set window to hide normally when not focused
   (app/doui
-    (window/set-z-order @state/*window :normal)))
+   (window/set-z-order @state/*window :normal)))
+
+
+
+
+
+
+
+

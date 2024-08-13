@@ -15,6 +15,7 @@
   (:require
    [humble-outliner.model :as model]
    [humble-outliner.theme :as theme]
+   [io.github.humbleui.signal :as signal]
    [io.github.humbleui.window :as window]))
 
 (def default-db
@@ -38,15 +39,12 @@
         (update :entities model/recalculate-entities-order order))))
 
 (def *db
-  (atom default-db))
+  (signal/signal default-db))
 
-(defn dispatch! [action]
-  (swap! *db action)
+(defn dispatch! [*demo action]
+  (swap! *demo action)
   ;; return true for convenience to be used in event handlers to stop bubbling
   true)
-
-(comment
-  (reset! *db default-db))
 
 (def *window
   "State of the main window. Gets set on app startup."

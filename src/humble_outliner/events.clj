@@ -3,7 +3,8 @@
    [clojure.string :as str]
    [humble-outliner.model :as model]
    [humble-outliner.theme :as theme]
-   [io.github.humbleui.core :as core]))
+   [io.github.humbleui.util :as util]
+   ))
 
 ;; Helpers
 
@@ -11,7 +12,7 @@
   (apply update-in db [:input-states id] f args))
 
 (defn- reset-input-blink-state! [db id]
-  (update-in db [:input-states id] assoc :cursor-blink-pivot (core/now)))
+  (update-in db [:input-states id] assoc :cursor-blink-pivot (util/now)))
 
 (defn- focus-item!
   ([db id] (focus-item! db id {:from 0 :to 0}))
@@ -21,7 +22,7 @@
                             :from from
                             :to to
                           ;; reset blink state on focus so that cursor is always visible when switching focus and does not "disappear" for brief moments
-                            :cursor-blink-pivot (core/now))
+                            :cursor-blink-pivot (util/now))
        (assoc :focused-id id))))
 
 (defn- switch-focus! [db id]

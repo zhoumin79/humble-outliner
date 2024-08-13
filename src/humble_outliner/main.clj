@@ -6,31 +6,65 @@
   (:require
    [humble-outliner.state :as state]
    [humble-outliner.views :as views]
+   [humble-outliner.shared :as shared]
+   [io.github.humbleui.util :as util]
+   [io.github.humbleui.window :as window]
    [io.github.humbleui.app :as app]
-   [io.github.humbleui.ui :as ui]))
+   [io.github.humbleui.ui :as ui])
+  (:import
+   [io.github.humbleui.jwm.skija LayerMetalSkija]
+   [io.github.humbleui.skija ColorSpace]))
 
-(defn window []
-  (ui/window
-    ;; Ideally, we would pass :bg-color option since window does canvas/clear.
-    ;; But it does not seem to work to grab the theme from context via top-level ui/dynamic.
-    ;; Therefore there is another canvas/clear in the `app` component that sets the background.
-    {:title "Outliner"}
-    state/*app))
+(defonce *app
+  (atom nil))
 
-;; reset current app state on eval of this ns
-#_(reset! state/*app views/app)
+(reset! *app
+  (ui/default-theme {}
+    (ui/make [views/app state/*db])))
 
-;; Replacement for `ui/start-app!` that does not start a separate thread.
-;; Workaround for a window not showing when compiled with Graal native image on macOS.
-(defmacro start-app! [& body]
-  `(app/start
-     (fn []
-       ~@body)))
+(defn maybe-save-window-rect [window event]
+  (when (#{:window-move :window-resize} (:event event))
+    (let [rect (window/window-rect window)
+          {:keys [id scale work-area]} (window/screen window)
+          x (-> rect :x (- (:x work-area)) (/ scale) int)
+          y (-> rect :y (- (:y work-area)) (/ scale) int)
+          w (-> rect :width (/ scale) int)
+          h (-> rect :height (/ scale) int)]
+      (shared/save-state {:screen-id id, :x x, :y y, :width w, :height h}))))
 
-(defn -main
-  "Run once on app start, starting the humble app."
-  [& args]
-  (reset! state/*app (views/app))
-  (start-app!
-   (reset! state/*window (window)))
-  (state/redraw!))
+(defn restore-window-rect []
+  (util/when-some+ [{:keys [screen-id x y width height]} (shared/load-state)]
+                   (when-some [screen (util/find-by :id screen-id (app/screens))]
+                     (let [{:keys [scale work-area]} screen
+                           right  (-> (:right work-area) (/ scale) int)
+                           bottom (-> (:bottom work-area) (/ scale) int)
+                           x      (min (- right 500) x)
+                           y      (min (- bottom 500) y)
+                           width  (min (- right x) width)
+                           height (min (- bottom y) height)]
+                       {:screen screen-id, :x x, :y y, :width width, :height height}))))
+
+(defn -main [& args]
+  ;; setup window
+  (ui/start-app!
+   (let [opts   (merge
+                 {:title    "test"
+                  :screen   (:id (first (app/screens)))
+                  :width    800
+                  :height   800
+                  :x        :center
+                  :y        :center
+                  :full-screen? true
+                  :on-event #'maybe-save-window-rect}
+                 (restore-window-rect))
+         window (ui/window opts *app)]
+      ;; TODO load real monitor profile
+     (when (= :macos app/platform)
+       (set! (.-_colorSpace ^LayerMetalSkija (.getLayer window)) (ColorSpace/getDisplayP3)))
+     (shared/set-floating! window @shared/*floating?)
+     (deliver shared/*window window)))
+  @shared/*window)
+
+
+
+
